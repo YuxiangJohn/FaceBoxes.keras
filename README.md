@@ -1,6 +1,6 @@
 ## FaceBoxes implementation in Keras
 ---
-Status: fixing bugs, wanting helps
+Status: just started, fixing bugs, wanting helps
 
 ### Overview
 
