@@ -14,4 +14,6 @@ This is a Keras port of the FaceBoxes architecture introduced by Shifeng Zhang e
 
 The project refers to the SSD framework:  [SSD_keras](https://github.com/pierluigiferrari/ssd_keras)
 
+The first implementation is without density.
+
 The faceboxes code are written in ./models/keras_ssd300.py. The training process and the setting of parameters are in ./ssd300_training.py.
