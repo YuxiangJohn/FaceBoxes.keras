@@ -28,6 +28,8 @@ from keras_layers.keras_layer_L2Normalization import L2Normalization
 from keras_layers.keras_layer_DecodeDetections import DecodeDetections
 from keras_layers.keras_layer_DecodeDetectionsFast import DecodeDetectionsFast
 
+import tensorflow as tf
+
 def ssd_300(image_size,
             n_classes = 1,
             mode='training',
@@ -252,6 +254,9 @@ def ssd_300(image_size,
             return K.stack([tensor[...,swap_channels[0]], tensor[...,swap_channels[1]], tensor[...,swap_channels[2]]], axis=-1)
         elif len(swap_channels) == 4:
             return K.stack([tensor[...,swap_channels[0]], tensor[...,swap_channels[1]], tensor[...,swap_channels[2]], tensor[...,swap_channels[3]]], axis=-1)
+            
+    def negative(tensor):
+        return tf.negative(tensor)
 
     ##### inception block #####
     def inception_module(x, para):
@@ -262,7 +267,7 @@ def ssd_300(image_size,
         x2 = Conv2D(32, (1, 1), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name=para+'Conv2')(y)
         #path 3
         y = Conv2D(24, (1, 1), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name=para+'Conv3_1')(x)
-        x3 = Conv2D(32, (3, 3), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name=para+'Conv1')(y)
+        x3 = Conv2D(32, (3, 3), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name=para+'Conv3_2')(y)
         #path 4
         y = Conv2D(24, (1, 1), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name=para+'Conv4_1')(x)
         y = Conv2D(32, (3, 3), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name=para+'Conv4_2')(y)
@@ -274,17 +279,31 @@ def ssd_300(image_size,
     # Build the network.
     ############################################################################
 
-    data_input = Input(shape=(img_height, img_width, img_channels))
-    #### Rapidly Digested Conv Layers ###
-    x = Conv2D(24, (7, 7), strides=(4, 4), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name='conv1')(data_input)
-    x = BatchNormalization(gamma_regularizer=l2(l2_reg), beta_regularizer=l2(l2_reg))(x)
-    x = Concatenate(axis=3, name='concat_n_1')([x, -x])
-    x = Activation('relu')(x)
-    x = MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='same', name='pool1')(x)
+    input_data = Input(shape=(img_height, img_width, img_channels))
+    #sss = Conv2D(24, (7, 7), strides=(4, 4), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name='conv1')(input_data)
+    #model = Model(inputs=input_data, outputs=sss)
+    # The following identity layer is only needed so that the subsequent lambda layers can be optional.
+    x1 = Lambda(identity_layer, output_shape=(img_height, img_width, img_channels), name='identity_layer')(input_data)
+    if not (subtract_mean is None):
+        x1 = Lambda(input_mean_normalization, output_shape=(img_height, img_width, img_channels), name='input_mean_normalization')(x1)
+    if not (divide_by_stddev is None):
+        x1 = Lambda(input_stddev_normalization, output_shape=(img_height, img_width, img_channels), name='input_stddev_normalization')(x1)
+    if swap_channels:
+        x1 = Lambda(input_channel_swap, output_shape=(img_height, img_width, img_channels), name='input_channel_swap')(x1)
     
+    #### Rapidly Digested Conv Layers ###
+    x = Conv2D(24, (7, 7), strides=(4, 4), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name='conv1')(x1)
+    x = BatchNormalization(gamma_regularizer=l2(l2_reg), beta_regularizer=l2(l2_reg))(x)
+    x_minus = Lambda(negative, name='negative_1')(x)
+    x = Concatenate(axis=3, name='concat_n_1')([x, x_minus])
+    x = Activation('relu')(x)
+    
+    x = MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='same', name='pool1')(x)
+    #model = Model(inputs=input_data, outputs=sss)
     x = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(l2_reg), name='conv2')(x)
     x = BatchNormalization(gamma_regularizer=l2(l2_reg), beta_regularizer=l2(l2_reg))(x)
-    x = Concatenate(axis=3, name='concat_n_2')([x, -x])
+    x_minus = Lambda(negative, name='negative_2')(x)
+    x = Concatenate(axis=3, name='concat_n_2')([x, x_minus])
     x = Activation('relu')(x)
     x = MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='same', name='pool2')(x)    
     
@@ -371,8 +390,10 @@ def ssd_300(image_size,
     # Output shape of `predictions`: (batch, n_boxes_total, n_classes + 4 + 8)
     predictions = Concatenate(axis=2, name='predictions')([mbox_conf_softmax, mbox_loc, mbox_priorbox])
     
+    
+    
     if mode == 'training':
-        model = Model(inputs=data_input, outputs=predictions)
+        model = Model(inputs=input_data, outputs=predictions)
     elif mode == 'inference':
         decoded_predictions = DecodeDetections(confidence_thresh=confidence_thresh,
                                                iou_threshold=iou_threshold,
@@ -383,7 +404,7 @@ def ssd_300(image_size,
                                                img_height=img_height,
                                                img_width=img_width,
                                                name='decoded_predictions')(predictions)
-        model = Model(inputs=data_input, outputs=decoded_predictions)
+        model = Model(inputs=input_data, outputs=decoded_predictions)
     elif mode == 'inference_fast':
         decoded_predictions = DecodeDetectionsFast(confidence_thresh=confidence_thresh,
                                                    iou_threshold=iou_threshold,
@@ -394,12 +415,12 @@ def ssd_300(image_size,
                                                    img_height=img_height,
                                                    img_width=img_width,
                                                    name='decoded_predictions')(predictions)
-        model = Model(inputs=data_input, outputs=decoded_predictions)
+        model = Model(inputs=input_data, outputs=decoded_predictions)
     else:
         raise ValueError("`mode` must be one of 'training', 'inference' or 'inference_fast', but received '{}'.".format(mode))                                    
     
                                         
-
+    
     if return_predictor_sizes:
         predictor_sizes = np.array([inception3_2_conf._keras_shape[1:3],
                                      Conv3_2_conf._keras_shape[1:3],
