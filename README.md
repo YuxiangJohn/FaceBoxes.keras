@@ -16,4 +16,4 @@ The project refers to the SSD framework:  [SSD_keras](https://github.com/pierlui
 
 The first implementation is without density.
 
-The faceboxes code are written in ./models/keras_ssd300.py. The training process and the setting of parameters are in ./ssd300_training.py.
+The faceboxes code are written in ./models/FaceBoxes.py. The training process and the setting of parameters are in ./FaceBoxes_train.py.
