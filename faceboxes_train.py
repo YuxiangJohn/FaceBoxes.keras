@@ -5,7 +5,7 @@ from keras.models import load_model
 from math import ceil
 import numpy as np
 
-from models.keras_ssd300 import ssd_300
+from models.FaceBoxes import faceboxes
 from keras_loss_function.keras_ssd_loss import SSDLoss
 from keras_layers.keras_layer_AnchorBoxes import AnchorBoxes
 from keras_layers.keras_layer_DecodeDetections import DecodeDetections
@@ -63,7 +63,7 @@ config.gpu_options.allow_growth = True
 sess = tf.Session(config=config)
 
 
-model = ssd_300(image_size=(img_height, img_width, img_channels),
+model = faceboxes(image_size=(img_height, img_width, img_channels),
                 n_classes=n_classes,
                 mode='training',
                 l2_regularization=0.0005,

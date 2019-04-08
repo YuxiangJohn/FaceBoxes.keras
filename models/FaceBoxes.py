@@ -1,7 +1,7 @@
 '''
 A Keras port of the original Caffe SSD300 network.
 
-Copyright (C) 2018 Pierluigi Ferrari
+Copyright (C) 2018 Yuxiang John
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ from keras_layers.keras_layer_DecodeDetectionsFast import DecodeDetectionsFast
 
 import tensorflow as tf
 
-def ssd_300(image_size,
+def faceboxes(image_size,
             n_classes = 1,
             mode='training',
             l2_regularization=0.0005,
